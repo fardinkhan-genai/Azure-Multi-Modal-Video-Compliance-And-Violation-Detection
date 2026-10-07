@@ -1,7 +1,5 @@
-import json
 import logging
 import os
-import re
 
 from langchain_community.vectorstores import AzureSearch
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -10,7 +8,11 @@ from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from backend.src.graph.state import VideoAuditState
 from backend.src.services.video_indexer import VideoIndexerService
 
+from backend.src.guardrails.compliance_guard import guard
+
+
 logger = logging.getLogger("azure-multimodal-compliance")
+
 
 
 def index_video_node(state: VideoAuditState):
@@ -36,10 +38,10 @@ def index_video_node(state: VideoAuditState):
         if os.path.exists(local_path):
             os.remove(local_path)
 
-        # 4. WAIT
+        # 4. WAIT FOR PROCESSING
         raw_data = service.wait_for_processing(azure_video_id)
 
-        # 5. EXTRACT
+        # 5. EXTRACT DATA
         return service.extract_data(raw_data)
 
     except Exception as error:
@@ -55,9 +57,16 @@ def index_video_node(state: VideoAuditState):
         }
 
 
+# ============================================================
+# COMPLIANCE AUDITOR NODE
+# ============================================================
+
 def audit_content_node(state: VideoAuditState):
     """Find the relevant rules and ask Azure OpenAI to audit the video.
     Performs Retrieval-Augmented Generation (RAG) to audit the content.
+
+    Guardrails AI validates the LLM output before
+    returning the final compliance result.
     """
     transcript = state.get("transcript", "")
 
@@ -137,25 +146,39 @@ def audit_content_node(state: VideoAuditState):
             HumanMessage(content=user_message),
         ])
 
-        content = response.content
+        raw_output = response.content
 
-        if "```" in content:
-            match = re.search(r"```(?:json)?(.*?)```", content, re.DOTALL)
-            if match:
-                content = match.group(1)
+        logger.info(
+            "Azure OpenAI response received."
+        )
 
-        result = json.loads(content.strip())
 
+
+        # GUARDRAILS AI
+        logger.info("Running Guardrails validation...")
+
+        validated = guard.parse(raw_output)
+        result = validated.validated_output
+
+        logger.info("Guardrails validation successful.")
+
+
+     
+        # RETURN VALIDATED RESULT
         return {
-            "compliance_results": result.get("compliance_results", []),
-            "final_status": result.get("status", "FAIL"),
-            "final_report": result.get("final_report", "No report generated."),
+            "compliance_results": result.get("compliance_results",[]),
+            "final_status": result.get("status","FAIL"),
+            "final_report": result.get("final_report","No report generated."),
         }
 
+
     except Exception as error:
-        logger.exception("Compliance audit failed")
+        logger.exception("Compliance audit or Guardrails validation failed.")
         return {
             "errors": [str(error)],
-            "final_status": "FAIL",
-            "final_report": "The compliance audit could not be completed.",
+            "final_status": "REQUIRES_REVIEW",
+            "final_report": (
+                "The AI compliance result could not "
+                "pass Guardrails validation. "
+                "Human review is required."),
         }

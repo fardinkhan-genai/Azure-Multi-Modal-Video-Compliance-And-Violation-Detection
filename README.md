@@ -1,8 +1,6 @@
 # Azure Multi-Modal Video Compliance & Violation Detection System
 
-An AI-based system that automatically checks advertisement videos for **compliance violations**.
-
-It uses **Azure Video Indexer, Azure AI Search, Azure OpenAI, LangGraph, LangSmith, Azure Monitor, FastAPI, and HTML/CSS/JavaScript**.
+An end-to-end **GenAI application** that analyzes advertisement videos and detects potential compliance violations using **Azure Video Indexer, Azure AI Search, Azure OpenAI, RAG, LangGraph, and Guardrails AI**.
 
 ## How It Works
 
@@ -19,24 +17,28 @@ Compliance Rules
      ↓
 Azure OpenAI
      ↓
-PASS / FAIL Report
+Guardrails AI
+     ↓
+PASS / FAIL / REQUIRES_REVIEW
 ```
 
-The workflow is managed using **LangGraph** and monitored using **LangSmith + Azure Monitor**.
+The workflow is orchestrated using **LangGraph** and monitored using **LangSmith and Azure Monitor**.
 
-## Main Features
+## Key Features
 
-- Takes a YouTube video URL
-- Extracts speech and on-screen text
-- Retrieves relevant compliance rules
-- Uses RAG for compliance checking
-- Uses Azure OpenAI for analysis
-- Generates PASS/FAIL results
-- Shows violations and severity
-- Provides a final compliance report
-- Uses LangSmith for tracing
-- Uses Azure Monitor for monitoring
-- Provides a simple web frontend
+- YouTube video processing
+- Speech/transcript extraction
+- OCR and on-screen text extraction
+- RAG-based compliance rule retrieval
+- Azure OpenAI compliance analysis
+- Guardrails AI output validation
+- Violation detection with severity
+- Structured compliance reports
+- LangGraph workflow orchestration
+- LangSmith tracing
+- Azure Monitor/Application Insights
+- FastAPI backend
+- HTML/CSS/JavaScript frontend
 
 ## Technology Stack
 
@@ -50,6 +52,7 @@ The workflow is managed using **LangGraph** and monitored using **LangSmith + Az
 - LangChain
 - LangGraph
 - RAG
+- Guardrails AI
 - Azure OpenAI Embeddings
 
 **Azure**
@@ -63,7 +66,7 @@ The workflow is managed using **LangGraph** and monitored using **LangSmith + Az
 - CSS
 - JavaScript
 
-**Monitoring**
+**Observability**
 - LangSmith
 - Azure Monitor
 
@@ -78,6 +81,7 @@ project/
 │   └── src/
 │       ├── api/
 │       ├── graph/
+│       ├── guardrails/
 │       └── services/
 │
 ├── frontend/
@@ -87,29 +91,33 @@ project/
 │
 ├── main.py
 ├── requirements.txt
-├── .env
+├── pyproject.toml
+├── .env.example
+├── .gitignore
 └── README.md
 ```
 
-## RAG Flow
+## RAG Pipeline
+
+Compliance documents are converted into embeddings and stored in **Azure AI Search**.
 
 ```text
-Compliance PDFs
-      ↓
-Text Extraction
-      ↓
-Text Chunks
-      ↓
+Compliance Documents
+        ↓
+Text Extraction & Chunking
+        ↓
 Azure OpenAI Embeddings
-      ↓
+        ↓
 Azure AI Search
-      ↓
-Compliance Knowledge Base
+        ↓
+Relevant Compliance Rules
+        ↓
+Azure OpenAI
 ```
 
-During video analysis, the system searches this knowledge base and gives the relevant rules to Azure OpenAI.
+During video analysis, the system retrieves relevant rules and provides them to the LLM for compliance evaluation.
 
-## LangGraph Flow
+## LangGraph Workflow
 
 ```text
 START
@@ -120,16 +128,27 @@ Extract Video Information
   ↓
 Auditor
   ↓
-Retrieve Rules
+Retrieve Compliance Rules
   ↓
 Azure OpenAI
+  ↓
+Guardrails Validation
   ↓
 Compliance Result
   ↓
 END
 ```
 
-The project uses two main nodes: **Indexer** and **Auditor**.
+### Main Nodes
+
+**Indexer**
+- Processes the video using Azure Video Indexer.
+- Extracts transcript, OCR, and metadata.
+
+**Auditor**
+- Retrieves compliance rules using Azure AI Search.
+- Performs RAG-based analysis with Azure OpenAI.
+- Validates the generated response using Guardrails AI.
 
 ## Example Result
 
@@ -140,14 +159,34 @@ The project uses two main nodes: **Indexer** and **Auditor**.
     {
       "category": "Claim Validation",
       "severity": "CRITICAL",
-      "description": "Compliance violation detected."
+      "description": "The advertisement contains an unsupported claim."
     }
   ],
   "final_report": "The advertisement requires compliance review."
 }
 ```
 
-## Run the Project
+Possible statuses:
+
+```text
+PASS
+FAIL
+REQUIRES_REVIEW
+```
+
+## Installation
+
+Create a virtual environment:
+
+```bash
+python -m venv .venv
+```
+
+Activate it on Windows:
+
+```bash
+.venv\Scriptsctivate
+```
 
 Install dependencies:
 
@@ -155,13 +194,17 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Start the server:
+Configure your `.env` file with the required Azure, LangSmith, and Application Insights credentials.
+
+## Run the Project
+
+Start the FastAPI server:
 
 ```bash
 uvicorn backend.src.api.server:app --reload
 ```
 
-Open:
+Open the application:
 
 ```text
 http://localhost:8000/
@@ -179,42 +222,9 @@ Health check:
 http://localhost:8000/health
 ```
 
+## Monitoring
+
+**LangSmith** is used for LLM and LangGraph tracing, while **Azure Monitor/Application Insights** is used for application monitoring, errors, and performance.
 
 
-## Environment Variables
-
-The project uses `.env` for:
-
-- Azure Video Indexer
-- Azure OpenAI
-- Azure AI Search
-- LangSmith
-- Azure Monitor
-
-**Never upload `.env` or API keys to GitHub.**
-
-## Resume Description
-
-**Azure Multi-Modal Video Compliance & Violation Detection System**
-
-Built a GenAI application using **Azure Video Indexer, Azure AI Search, Azure OpenAI, LangGraph, LangSmith, and RAG** to analyze advertisement videos, detect compliance violations, and generate structured PASS/FAIL reports. Added FastAPI, web frontend, and Azure Monitor for monitoring.
-
-## Project Value
-
-```text
-Video Understanding
-       +
-RAG
-       +
-Azure OpenAI
-       +
-LangGraph
-       +
-LangSmith
-       +
-Azure Monitoring
-       +
-Web Application
-```
-
-This project demonstrates an end-to-end **enterprise GenAI + RAG + Agentic Workflow** application.
+> **Security:** Never commit `.env`, API keys, or Azure credentials to GitHub. Use `.env.example` for configuration reference.
