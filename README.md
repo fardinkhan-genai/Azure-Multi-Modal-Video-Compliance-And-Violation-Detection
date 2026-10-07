@@ -653,13 +653,6 @@ It is particularly useful as a portfolio project because it shows how an LLM can
 
 ---
 
-## 19. Resume-Ready Description
-
-**Azure Multi-Modal Video Compliance & Violation Detection System**  
-Built an end-to-end GenAI application using Azure Video Indexer, Azure AI Search, Azure OpenAI, LangGraph, and LangSmith to automatically analyze advertisement videos, extract transcript/OCR data, retrieve relevant compliance policies using RAG, and generate structured PASS/FAIL compliance reports with violation severity and explanations. Implemented FastAPI APIs, a separate HTML/CSS/JavaScript frontend, and Azure Monitor observability.
-
----
-
-## 20. Disclaimer
+## 19. Disclaimer
 
 This project is an AI-assisted compliance screening system and should be treated as a decision-support tool. Final regulatory, legal, or publication decisions should be reviewed by an appropriate human compliance professional.
