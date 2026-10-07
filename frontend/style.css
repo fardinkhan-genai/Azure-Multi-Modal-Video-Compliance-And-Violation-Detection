@@ -1,0 +1,114 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f7fb;
+    color: #1f2937;
+}
+
+.container {
+    width: min(1000px, 92%);
+    margin: 40px auto;
+}
+
+.card {
+    background: white;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+    margin-bottom: 20px;
+}
+
+.header h1 {
+    margin: 0 0 8px;
+}
+
+.header p,
+.muted {
+    color: #6b7280;
+}
+
+label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+input {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+button {
+    margin-top: 14px;
+    padding: 13px 22px;
+    border: 0;
+    border-radius: 10px;
+    background: #2563eb;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.status {
+    display: inline-block;
+    padding: 7px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.pass {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.fail {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.unknown {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.issue {
+    border-left: 5px solid #ef4444;
+    background: #fafafa;
+    padding: 14px;
+    margin: 12px 0;
+    border-radius: 8px;
+}
+
+.issue strong {
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.report {
+    white-space: pre-wrap;
+    line-height: 1.6;
+}
+
+.error {
+    color: #991b1b;
+    background: #fee2e2;
+    padding: 14px;
+    border-radius: 10px;
+}
+
+.hidden {
+    display: none;
+}

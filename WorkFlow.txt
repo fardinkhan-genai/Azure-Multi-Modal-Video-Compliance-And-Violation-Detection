@@ -1,0 +1,884 @@
+# Azure Multi-Modal Video Compliance & Violation Detection
+# End-to-End Workflow
+
+## 1. Business Problem
+
+Companies publish advertisement and promotional videos across digital platforms.
+
+Before publishing, these videos may need to be checked against:
+
+- Advertising guidelines
+- Brand rules
+- Influencer guidelines
+- Regulatory policies
+- Approved claims
+- On-screen text requirements
+
+Manual review can be time-consuming.
+
+This project automates the first level of compliance screening using Azure AI and Generative AI.
+
+---
+
+# 2. High-Level Workflow
+
+```text
+User
+ │
+ │ YouTube Video URL
+ ▼
+Frontend
+ │
+ │ POST /audit
+ ▼
+FastAPI
+ │
+ ▼
+LangGraph Workflow
+ │
+ ├───────────────┐
+ ▼               │
+Indexer Node     │
+ │               │
+ ▼               │
+Download Video   │
+ │               │
+ ▼               │
+Azure Video      │
+Indexer           │
+ │               │
+ ├── Transcript  │
+ ├── OCR Text    │
+ └── Metadata    │
+ │
+ ▼
+Auditor Node
+ │
+ ├───────────────┐
+ │               │
+ ▼               ▼
+Azure AI Search  Azure OpenAI
+ │               │
+ │ Rules         │ Reasoning
+ ▼               │
+Retrieved Rules ─┘
+ │
+ ▼
+Compliance Result
+ │
+ ├── PASS / FAIL
+ ├── Violations
+ ├── Severity
+ ├── Category
+ └── Final Report
+ │
+ ▼
+FastAPI Response
+ │
+ ▼
+Frontend
+ │
+ ▼
+User
+```
+
+---
+
+# 3. Step-by-Step Workflow
+
+## Step 1 — User Provides Advertisement Video
+
+The user opens the web application.
+
+Example:
+
+```text
+https://youtu.be/example
+```
+
+The frontend collects the URL.
+
+Frontend files:
+
+```text
+frontend/
+├── index.html
+├── style.css
+└── script.js
+```
+
+The JavaScript sends the URL to:
+
+```text
+POST /audit
+```
+
+Request:
+
+```json
+{
+  "video_url": "https://youtu.be/example"
+}
+```
+
+---
+
+# Step 2 — FastAPI Receives the Request
+
+File:
+
+```text
+backend/src/api/server.py
+```
+
+FastAPI:
+
+```text
+POST /audit
+```
+
+creates:
+
+```text
+session_id
+video_id
+```
+
+Example:
+
+```text
+session_id = UUID
+video_id   = vid_a1b2c3d4
+```
+
+The API creates the initial LangGraph state.
+
+```text
+video_url
+video_id
+compliance_results
+errors
+```
+
+---
+
+# Step 3 — LangSmith Trace Starts
+
+The complete LangGraph execution is wrapped with LangSmith tracing.
+
+```text
+FastAPI
+   │
+   ▼
+LangSmith Trace
+   │
+   ▼
+LangGraph
+```
+
+The trace includes information such as:
+
+```text
+Project
+Workflow Name
+Session ID
+Video ID
+Tags
+Metadata
+```
+
+This allows the AI workflow to be inspected and debugged through LangSmith.
+
+---
+
+# Step 4 — LangGraph Starts
+
+File:
+
+```text
+backend/src/graph/workflow.py
+```
+
+The workflow contains two main nodes:
+
+```text
+START
+  ↓
+indexer
+  ↓
+auditor
+  ↓
+END
+```
+
+The workflow state is defined in:
+
+```text
+backend/src/graph/state.py
+```
+
+---
+
+# Step 5 — Indexer Node
+
+File:
+
+```text
+backend/src/graph/nodes.py
+```
+
+Function:
+
+```text
+index_video_node()
+```
+
+The node performs the video ingestion process.
+
+```text
+YouTube URL
+     ↓
+Validate URL
+     ↓
+yt-dlp
+     ↓
+Local MP4
+```
+
+---
+
+# Step 6 — Download YouTube Video
+
+The application uses:
+
+```text
+yt-dlp
+```
+
+to download the video temporarily.
+
+```text
+YouTube
+   ↓
+yt-dlp
+   ↓
+temp_audit_video.mp4
+```
+
+After the upload process, the temporary local file is removed.
+
+---
+
+# Step 7 — Azure Video Indexer
+
+File:
+
+```text
+backend/src/services/video_indexer.py
+```
+
+The application authenticates to Azure using:
+
+```text
+DefaultAzureCredential
+```
+
+The Azure management token is used to obtain a Video Indexer account access token.
+
+Then:
+
+```text
+Local Video
+    ↓
+Azure Video Indexer
+```
+
+The video is uploaded as private content.
+
+---
+
+# Step 8 — Azure Video Indexer Processes the Video
+
+Azure Video Indexer analyzes the uploaded video.
+
+The project uses the extracted information needed for compliance analysis:
+
+```text
+Video
+ │
+ ├── Speech
+ │     ↓
+ │   Transcript
+ │
+ ├── On-Screen Text
+ │     ↓
+ │   OCR
+ │
+ └── Video Metadata
+```
+
+The application waits until the video reaches:
+
+```text
+Processed
+```
+
+If processing fails:
+
+```text
+Failed
+```
+
+the workflow records an error.
+
+If Azure quarantines the video:
+
+```text
+Quarantined
+```
+
+the workflow stops the indexing operation.
+
+---
+
+# Step 9 — Extract Video Information
+
+The Video Indexer response is converted into the application state.
+
+Output:
+
+```text
+transcript
+ocr_text
+video_metadata
+```
+
+Example:
+
+```text
+Transcript:
+"Introducing our new product with advanced AI features..."
+
+OCR:
+"50% faster"
+"AI Powered"
+
+Metadata:
+Duration
+Platform
+```
+
+---
+
+# Step 10 — Auditor Node
+
+The second LangGraph node is:
+
+```text
+audit_content_node()
+```
+
+Its responsibility is to perform the compliance analysis.
+
+The auditor receives:
+
+```text
+Transcript
++
+OCR Text
++
+Video Metadata
+```
+
+---
+
+# Step 11 — Connect to Azure AI Search
+
+Azure AI Search acts as the project's compliance knowledge base.
+
+The knowledge base is created from PDF documents.
+
+Example:
+
+```text
+backend/data/
+│
+├── 1001a-influencer-guide-508_1.pdf
+└── youtube-ad-specs.pdf
+```
+
+These documents contain compliance and advertising rules.
+
+---
+
+# Step 12 — Build the Knowledge Base
+
+File:
+
+```text
+backend/scripts/index_documents.py
+```
+
+The indexing pipeline is:
+
+```text
+PDF
+ ↓
+PyPDFLoader
+ ↓
+Extract Text
+ ↓
+RecursiveCharacterTextSplitter
+ ↓
+Text Chunks
+ ↓
+Azure OpenAI Embeddings
+ ↓
+Azure AI Search
+```
+
+The result is a searchable vector knowledge base.
+
+---
+
+# Step 13 — Generate Embeddings
+
+Azure OpenAI Embeddings convert text chunks into vectors.
+
+Conceptually:
+
+```text
+Compliance Rule
+      ↓
+Embedding Model
+      ↓
+Vector
+```
+
+These vectors are stored in Azure AI Search.
+
+This allows semantic similarity search rather than relying only on exact keyword matching.
+
+---
+
+# Step 14 — Retrieve Relevant Compliance Rules
+
+During the video audit:
+
+```text
+Transcript
++
+OCR
+    ↓
+Search Query
+    ↓
+Azure AI Search
+    ↓
+Top Relevant Documents
+```
+
+The implementation retrieves:
+
+```text
+k = 3
+```
+
+relevant documents.
+
+The retrieved document content becomes the compliance context for the LLM.
+
+---
+
+# Step 15 — Build the LLM Audit Prompt
+
+The auditor combines:
+
+```text
+Official Compliance Rules
++
+Video Transcript
++
+On-Screen Text
++
+Video Metadata
+```
+
+and sends them to Azure OpenAI.
+
+Conceptually:
+
+```text
+             ┌────────────────────┐
+             │ Compliance Rules   │
+             └─────────┬──────────┘
+                       │
+                       ▼
+Transcript ───────► Azure OpenAI ◄────── OCR
+                       ▲
+                       │
+                 Video Metadata
+```
+
+---
+
+# Step 16 — Azure OpenAI Compliance Reasoning
+
+Azure OpenAI acts as the reasoning layer.
+
+The model checks the video information against the retrieved compliance rules.
+
+It is instructed to return structured JSON.
+
+Expected structure:
+
+```json
+{
+  "compliance_results": [],
+  "status": "PASS",
+  "final_report": "No violations found."
+}
+```
+
+or:
+
+```json
+{
+  "compliance_results": [
+    {
+      "category": "Claim Validation",
+      "severity": "CRITICAL",
+      "description": "Explanation of the violation."
+    }
+  ],
+  "status": "FAIL",
+  "final_report": "Compliance violations were identified."
+}
+```
+
+---
+
+# Step 17 — Compliance Decision
+
+The result contains:
+
+```text
+Status
+│
+├── PASS
+└── FAIL
+```
+
+If violations exist:
+
+```text
+Category
+Severity
+Description
+```
+
+are returned.
+
+Example:
+
+```text
+FAIL
+
+Category:
+Claim Validation
+
+Severity:
+CRITICAL
+
+Description:
+The advertisement contains a claim that is not supported by
+the retrieved compliance rules.
+```
+
+---
+
+# Step 18 — LangGraph Completes
+
+After the auditor node finishes:
+
+```text
+indexer
+   ↓
+auditor
+   ↓
+END
+```
+
+The final LangGraph state is returned to FastAPI.
+
+---
+
+# Step 19 — FastAPI Returns the Result
+
+FastAPI converts the workflow result into an API response.
+
+Response contains:
+
+```text
+session_id
+video_id
+status
+final_report
+compliance_results
+```
+
+Example:
+
+```json
+{
+  "session_id": "uuid",
+  "video_id": "vid_a1b2c3d4",
+  "status": "FAIL",
+  "final_report": "Compliance violations were identified.",
+  "compliance_results": [
+    {
+      "category": "Claim Validation",
+      "severity": "CRITICAL",
+      "description": "Unsupported claim detected."
+    }
+  ]
+}
+```
+
+---
+
+# Step 20 — Frontend Displays the Result
+
+The JavaScript receives the API response.
+
+The UI displays:
+
+```text
+Audit Result
+
+Status: FAIL
+
+Summary:
+Compliance violations were identified.
+
+Violations:
+
+[CRITICAL]
+Claim Validation
+
+Unsupported claim detected.
+```
+
+The frontend also handles API errors and displays an error message when the audit fails.
+
+---
+
+# 21. Monitoring and Observability
+
+The project uses two observability layers.
+
+## LangSmith
+
+Used mainly for:
+
+```text
+LangGraph workflow tracing
+LLM execution tracing
+Run metadata
+Tags
+Debugging
+```
+
+Flow:
+
+```text
+FastAPI
+   ↓
+LangSmith
+   ↓
+LangGraph
+   ↓
+LLM Workflow
+```
+
+## Azure Monitor / Application Insights
+
+Configured in:
+
+```text
+backend/src/api/telemetry.py
+```
+
+Used for application-level monitoring and diagnostics.
+
+Conceptually:
+
+```text
+Application
+   │
+   ├── Requests
+   ├── Errors
+   ├── Logs
+   └── Performance
+        │
+        ▼
+Azure Monitor
+```
+
+---
+
+# 22. Complete Technical Workflow
+
+```text
+                 USER
+                   │
+                   ▼
+          YouTube Video URL
+                   │
+                   ▼
+        HTML/CSS/JavaScript
+                   │
+                   │ POST /audit
+                   ▼
+                FastAPI
+                   │
+                   ▼
+             LangSmith
+              Tracing
+                   │
+                   ▼
+             LangGraph
+                   │
+             ┌─────┴─────┐
+             ▼           │
+          INDEXER        │
+             │            │
+             ▼            │
+           yt-dlp         │
+             │            │
+             ▼            │
+        Local MP4         │
+             │            │
+             ▼            │
+    Azure Video Indexer   │
+             │            │
+       ┌─────┼─────┐      │
+       ▼     ▼     ▼      │
+   Speech   OCR  Metadata  │
+       │     │     │       │
+       └─────┴─────┘       │
+             │             │
+             ▼             │
+          AUDITOR ◄────────┘
+             │
+       ┌─────┴─────────────┐
+       ▼                   ▼
+Azure AI Search       Azure OpenAI
+       │                   │
+Compliance Rules       AI Reasoning
+       │                   │
+       └─────────┬─────────┘
+                 ▼
+        Compliance Decision
+                 │
+        ┌────────┴────────┐
+        ▼                 ▼
+       PASS              FAIL
+        │                 │
+        └────────┬────────┘
+                 ▼
+          Final Audit Report
+                 │
+                 ▼
+              FastAPI
+                 │
+                 ▼
+             Frontend
+                 │
+                 ▼
+                USER
+
+
+      ┌───────────────────────────────┐
+      │       Observability           │
+      │                               │
+      │  LangSmith + Azure Monitor    │
+      └───────────────────────────────┘
+```
+
+---
+
+# 23. One-Line Interview Explanation
+
+> "I built a multi-modal video compliance system where Azure Video Indexer extracts transcript and OCR data, Azure AI Search retrieves relevant compliance policies using RAG, Azure OpenAI performs the compliance reasoning, and LangGraph orchestrates the workflow while LangSmith and Azure Monitor provide observability."
+
+---
+
+# 24. Simple Interview Explanation
+
+If asked:
+
+### "How does your project work?"
+
+Answer:
+
+> "The user provides a YouTube advertisement URL. The system downloads the video and sends it to Azure Video Indexer, which extracts the transcript and on-screen text. LangGraph then passes this information to the auditor node. The auditor performs RAG against compliance documents stored in Azure AI Search and retrieves the most relevant rules. Those rules, together with the video transcript and OCR text, are sent to Azure OpenAI. The model checks the content against the rules and generates a structured PASS or FAIL report with violations and severity. LangSmith traces the AI workflow, while Azure Monitor handles application telemetry."
+
+---
+
+# 25. Main Technologies and Their Responsibilities
+
+| Technology | Responsibility |
+|---|---|
+| HTML/CSS/JavaScript | User interface |
+| FastAPI | Backend API |
+| yt-dlp | YouTube video download |
+| Azure Video Indexer | Video understanding |
+| Azure AI Search | Compliance knowledge base + retrieval |
+| Azure OpenAI Embeddings | Convert compliance text into vectors |
+| Azure OpenAI | Compliance reasoning |
+| LangGraph | Workflow orchestration |
+| LangSmith | AI workflow tracing |
+| Azure Monitor | Application telemetry |
+| PyPDF | PDF text extraction |
+| LangChain | LLM, embeddings, retrieval integrations |
+
+---
+
+# 26. Final Architecture
+
+```text
+                  MULTI-MODAL VIDEO
+                         │
+                         ▼
+                   Azure Video
+                      Indexer
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+          Transcript               OCR
+              │                     │
+              └──────────┬──────────┘
+                         ▼
+                  Compliance Query
+                         │
+                         ▼
+                  Azure AI Search
+                         │
+                  Relevant Policies
+                         │
+                         ▼
+                    Azure OpenAI
+                         │
+                  Compliance Reasoning
+                         │
+                         ▼
+                 Structured Decision
+                         │
+                  ┌──────┴──────┐
+                  ▼             ▼
+                 PASS          FAIL
+                                │
+                         Violations +
+                          Severity +
+                           Report
+```

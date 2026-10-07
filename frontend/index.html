@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+    Azure Multi-Modal Video Compliance &amp; Violation Detection
+</title>
+    <link rel="stylesheet" href="/frontend/style.css">
+</head>
+<body>
+    <main class="container">
+        <section class="header card">
+            <h1>
+    Azure Multi-Modal Video Compliance &amp; Violation Detection
+</h1>
+            <p>
+    Analyze videos for compliance violations using Azure AI,
+    LangGraph, RAG, and multimodal analysis.
+</p>
+        </section>
+
+        <section class="card">
+            <label for="videoUrl">YouTube Video URL</label>
+            <input id="videoUrl" type="url" placeholder="https://youtu.be/...">
+            <button id="auditButton">Start Compliance Audit</button>
+            <p id="message" class="muted"></p>
+        </section>
+
+        <section id="result" class="card hidden">
+            <h2>Audit Result</h2>
+            <div id="status"></div>
+
+            <h3>Summary</h3>
+            <div id="report" class="report"></div>
+
+            <h3>Violations</h3>
+            <div id="issues"></div>
+        </section>
+
+        <section id="error" class="error hidden"></section>
+    </main>
+
+    <script src="/frontend/script.js"></script>
+</body>
+</html>
